@@ -95,6 +95,11 @@ const _LANGUAGES = {
         main: require('../../../../lang/main-ko')
     },
 
+    // Lithuanian
+    'lt': {
+        main: require('../../../../lang/main-lt')
+    },
+
     // Mongolian
     'mn': {
         main: require('../../../../lang/main-mn')
