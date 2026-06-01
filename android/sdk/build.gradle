@@ -126,7 +126,13 @@ android.libraryVariants.all { def variant ->
 
         // Set up inputs and outputs so gradle can cache the result
         def reactRoot = file("${projectDir}/../../")
-        inputs.files fileTree(dir: reactRoot, excludes: ["android/**", "ios/**"])
+        inputs.files fileTree(
+            dir: reactRoot,
+            excludes: [
+                "android/**",
+                "ios/**",
+                "node_modules/**/android/build/**"
+            ])
         outputs.dir jsBundleDir
         outputs.dir resourcesDir
 

@@ -173,6 +173,12 @@ allprojects {
                     }
                 }
             }
+
+            tasks.matching {
+                it.name.startsWith('publish') && it.name.endsWith('PublicationToMavenRepository')
+            }.configureEach {
+                dependsOn(tasks.named('bundleReleaseAar'))
+            }
         }
     }
 }
