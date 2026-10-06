@@ -255,8 +255,12 @@ function update_presence_identity(stanza, user, group, creator_user, creator_gro
 
     stanza:tag("identity"):tag("user");
     for k, v in pairs(user) do
-        v = tostring(v)
-        stanza:tag(k):text(v):up();
+        -- Skip keys that are not valid XML element names (e.g. contain '<', '>').
+        -- Using such keys as tag names crashes LuaXML.
+        if k:match("^[%a_][%w%-%.%:_]*$") then
+            v = tostring(v)
+            stanza:tag(k):text(v):up();
+        end
     end
     stanza:up();
 
@@ -269,7 +273,9 @@ function update_presence_identity(stanza, user, group, creator_user, creator_gro
     if creator_user then
         stanza:tag("creator_user");
         for k, v in pairs(creator_user) do
-            stanza:tag(k):text(v):up();
+            if k:match("^[%a_][%w%-%.%:_]*$") then
+                stanza:tag(k):text(v):up();
+            end
         end
         stanza:up();
 
@@ -350,6 +356,22 @@ function ends_with(str, ending)
     end
 
     return ending == "" or str:sub(-#ending) == ending
+end
+
+--- Returns a JWT without its signature, safe to write to the logs.
+-- A token with a valid signature is a bearer credential. The header and
+-- the payload alone cannot be used to authenticate.
+-- @param token the JWT
+-- @return 'header.payload', nil for a nil token, or '[redacted]' when the
+-- value does not have the form of a JWT
+function strip_jwt_signature(token)
+    if token == nil then
+        return nil;
+    end
+
+    local unsigned = tostring(token):match('^([^.]*%.[^.]*)%.');
+
+    return unsigned or '[redacted]';
 end
 
 -- healthcheck rooms in jicofo starts with a string '__jicofo-health-check'
@@ -814,6 +836,7 @@ return {
     split_string = split_string;
     starts_with = starts_with;
     starts_with_one_of = starts_with_one_of;
+    strip_jwt_signature = strip_jwt_signature;
     table_add = table_add;
     table_compare = table_compare;
     table_shallow_copy = table_shallow_copy;

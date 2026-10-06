@@ -192,9 +192,28 @@ class Popover extends Component<IProps, IState> {
      */
     override componentDidMount() {
         window.addEventListener('touchstart', this._onOutsideTouchStart);
+        if (this.props.visible) {
+            window.addEventListener('keydown', this._onEscKey);
+        }
         if (this.props.trigger === 'click') {
             // @ts-ignore
             window.addEventListener('click', this._onOutsideClick);
+        }
+    }
+
+    /**
+     * Attaches/removes the global Escape key listener as visibility changes.
+     *
+     * @inheritdoc
+     * @returns {void}
+     */
+    override componentDidUpdate(prevProps: IProps) {
+        if (prevProps.visible !== this.props.visible) {
+            if (this.props.visible) {
+                window.addEventListener('keydown', this._onEscKey);
+            } else {
+                window.removeEventListener('keydown', this._onEscKey);
+            }
         }
     }
 
@@ -206,6 +225,7 @@ class Popover extends Component<IProps, IState> {
      */
     override componentWillUnmount() {
         window.removeEventListener('touchstart', this._onOutsideTouchStart);
+        window.removeEventListener('keydown', this._onEscKey);
         if (this.props.trigger === 'click') {
             // @ts-ignore
             window.removeEventListener('click', this._onOutsideClick);
@@ -218,8 +238,10 @@ class Popover extends Component<IProps, IState> {
      * @param {MouseEvent} e - The click event.
      * @returns {void}
      */
-    _onOutsideClick(e: React.MouseEvent) {
-        if (!this._containerRef?.current?.contains(e.target as Node) && this.props.visible) {
+    _onOutsideClick(e: MouseEvent) {
+        if (!this._containerRef?.current?.contains(e.target as Node)
+            && !this._contextMenuRef?.contains?.(e.target as Node)
+            && this.props.visible) {
             this._onHideDialog();
         }
     }
@@ -453,7 +475,7 @@ class Popover extends Component<IProps, IState> {
      *
      * @returns {void}
      */
-    _onEscKey(e: React.KeyboardEvent) {
+    _onEscKey(e: KeyboardEvent | React.KeyboardEvent) {
         if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();

@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigationIndependentTree } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,35 +24,34 @@ const LobbyNavigationContainer = () => {
         = useSelector((state: IReduxState) => state['features/chat']);
 
     return (
-        <NavigationContainer
-            independent = { true }
-            ref = { lobbyNavigationContainerRef }
-
-            // @ts-ignore
-            theme = { navigationContainerTheme }>
-            <LobbyStack.Navigator
-                screenOptions = {{
-                    presentation: 'modal'
-                }}>
-                <LobbyStack.Screen
-                    component = { LobbyScreen }
-                    name = { screen.lobby.main }
-                    options = {{
-                        ...lobbyScreenOptions,
-                        title: t('lobby.title')
-                    }} />
-                {
-                    isLobbyChatActive
-                    && <LobbyStack.Screen
-                        component = { LobbyChatScreen }
-                        name = { screen.lobby.chat }
+        <NavigationIndependentTree>
+            <NavigationContainer
+                ref = { lobbyNavigationContainerRef }
+                theme = { navigationContainerTheme }>
+                <LobbyStack.Navigator
+                    screenOptions = {{
+                        presentation: 'modal'
+                    }}>
+                    <LobbyStack.Screen
+                        component = { LobbyScreen }
+                        name = { screen.lobby.main }
                         options = {{
-                            ...lobbyChatScreenOptions,
-                            title: t('lobby.chat')
+                            ...lobbyScreenOptions,
+                            title: t('lobby.title')
                         }} />
-                }
-            </LobbyStack.Navigator>
-        </NavigationContainer>
+                    {
+                        isLobbyChatActive
+                        && <LobbyStack.Screen
+                            component = { LobbyChatScreen }
+                            name = { screen.lobby.chat }
+                            options = {{
+                                ...lobbyChatScreenOptions,
+                                title: t('lobby.chat')
+                            }} />
+                    }
+                </LobbyStack.Navigator>
+            </NavigationContainer>
+        </NavigationIndependentTree>
     );
 
 };

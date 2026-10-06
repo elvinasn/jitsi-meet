@@ -1,3 +1,18 @@
+-- USAGE / DEPLOYMENT
+--   This is a server-to-server endpoint. It is meant to be called only by
+--   trusted backend services over a controlled network path (e.g. Prosody's
+--   HTTP port reachable only from internal hosts). It is NOT safe to make it
+--   publicly accessible: do not proxy it from the public web server (nginx)
+--   and do not expose Prosody's HTTP ports (5280/5281) to the internet.
+--
+--   The Bearer token is a system token signed with a dedicated key pair whose
+--   public keys are served from prosody_password_public_key_repo_url. That
+--   option must be set; the private key must only be available to the calling
+--   services. A valid system token authorizes the caller for every room on
+--   the deployment. It is intentionally not bound to a room: there is no
+--   room claim / room ownership check, the calling service is responsible
+--   for deciding which room it acts on.
+--
 -- HTTP module that exposes a POST /invite-jigasi endpoint for inviting a Jigasi
 -- SIP gateway instance to dial out to a phone number and connect it to a
 -- conference. Intended for internal system use (e.g. by a backend service),
@@ -55,10 +70,12 @@ local event_count = module:measure("muc_invite_jigasi_rate", "rate")
 local event_count_success = module:measure("muc_invite_jigasi_success", "rate")
 local ASAP_KEY_SERVER = module:get_option_string("prosody_password_public_key_repo_url", "");
 local token_util = module:require "token/util".new(module);
-if ASAP_KEY_SERVER then
-    -- init token util with our asap keyserver
-    token_util:set_asap_key_server(ASAP_KEY_SERVER)
+if ASAP_KEY_SERVER == "" then
+    module:log("warn", "No 'prosody_password_public_key_repo_url' option set, disabling invite-jigasi endpoint.");
+    return;
 end
+-- init token util with our asap keyserver
+token_util:set_asap_key_server(ASAP_KEY_SERVER)
 
 local function invite_jigasi(conference, phone_no)
     local jigasi_brewery_room = main_muc_service.get_room_from_jid(jigasi_brewery_room_jid);
@@ -76,32 +93,36 @@ local function invite_jigasi(conference, phone_no)
             local occ = occupant:get_presence();
             local stats_child = occ:get_child("stats", "http://jitsi.org/protocol/colibri")
 
-            local is_sip_jigasi = true;
-            for stats_tag in stats_child:children() do
-                if stats_tag.attr.name == 'supports_sip' and stats_tag.attr.value == 'false' then
-                    is_sip_jigasi = false;
-                end
-            end
-
-            if is_sip_jigasi then
+            if not stats_child then
+                module:log("warn", "Jigasi occupant %s has no stats element, skipping", occupant_jid);
+            else
+                local is_sip_jigasi = true;
                 for stats_tag in stats_child:children() do
-                    if stats_tag.attr.name == 'stress_level' then
-                        local stress_level = tonumber(stats_tag.attr.value);
-                        module:log("debug", "Stressed level %s %s ", stress_level, occupant_jid)
-                        if stress_level < least_stressed_value then
-                            least_stressed_jigasi_occupant = occupant;
-                            least_stressed_value = stress_level
+                    if stats_tag.attr.name == 'supports_sip' and stats_tag.attr.value == 'false' then
+                        is_sip_jigasi = false;
+                    end
+                end
+
+                if is_sip_jigasi then
+                    for stats_tag in stats_child:children() do
+                        if stats_tag.attr.name == 'stress_level' then
+                            local stress_level = tonumber(stats_tag.attr.value);
+                            module:log("debug", "Stressed level %s %s ", stress_level, occupant_jid)
+                            if stress_level < least_stressed_value then
+                                least_stressed_jigasi_occupant = occupant;
+                                least_stressed_value = stress_level
+                            end
                         end
                     end
                 end
             end
         end
     end
-    module:log("debug", "Least stressed jigasi selected jid %s value %s", least_stressed_jigasi_occupant.jid, least_stressed_value)
     if not least_stressed_jigasi_occupant then
         module:log("error", "Cannot invite jigasi from room %s", jigasi_brewery_room.jid)
         return 404, 'Jigasi not found'
     end
+    module:log("debug", "Least stressed jigasi selected jid %s value %s", least_stressed_jigasi_occupant.jid, least_stressed_value)
 
     -- invite Jigasi to join the conference
     local stanza_id = hashes.sha256(random.bytes(8), true);

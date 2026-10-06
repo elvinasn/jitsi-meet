@@ -38,7 +38,7 @@
 - av_moderation_startMuted_restore - Keeps the startMuted metadata state of the room before AV moderation was applied. Used by mod_av_moderation_component.lua.
 - broadcast_timer - A timer used to broadcast the list of breakout rooms in the main room. It is set by mod_muc_breakout_rooms.lua to periodically update the list of breakout rooms.
 - close_timer - A timer used to close the main room when all occupants have left. It is set by mod_muc_breakout_rooms.lua to clean up the main room after all participants left from breakout room.
-- created_timestamp - A timestamp in milliseconds when the room was created. It is set by mod_conference_duration_component.lua and used by mod_conference_duration.lua to calculate the conference duration. It is also used by mod_measure_message_count.lua to calculate the room duration for analytics.
+- created_timestamp - A timestamp in milliseconds when the room was created. It is set by mod_conference_duration.lua and used to calculate the conference duration. It is also used by mod_measure_message_count.lua to calculate the room duration for analytics.
 - has_host - Whether the host (an authenticated user) has arrived in the room.
 - is_vpaas - A boolean value indicating whether the room is a VPAAS room, optimization for the is_vpaas function in util.internal.lib.lua.
 - jibri_throttle - A throttle object used to limit the number of Jibri requests per room. It is created in mod_filter_iq_jibri.lua to prevent abuse of Jibri resources.
@@ -95,6 +95,7 @@
 - jitsi_meet_context_features - The features from the context, added after token verify.
 - jitsi_meet_context_room - The room settings from the jwt context, added after token verify.
 - jitsi_meet_room - The room name in jwt token, added after token verify.
+- jitsi_meet_verified_room - The jid of the room the session was verified for on join. Set by mod_token_verification.lua and used to re-check claims that are refreshed later, when a resuming connection presents a different token.
 - jitsi_meet_str_tenant - The tenant in the context. Added after token verify.
 - jitsi_meet_domain - The domain in the jwt ('sub' claim). Added after token verify. Can be the domain if not tenant is used or the tenant itself in lowercase.
 - customusername - from a query parameter to be used with combination with "pre-jitsi-authentication" event to pre-set a known jid to a session.

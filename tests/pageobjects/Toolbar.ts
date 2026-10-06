@@ -1,6 +1,12 @@
 import BasePageObject from './BasePageObject';
 
 const AUDIO_MUTE = 'Mute microphone';
+const RECORDING = 'Record & Transcribe';
+
+// Non-moderators (who can only do local recording) get a "Record" button instead of the
+// moderator's "Record & Transcribe" — see AbstractRecordButton._getAccessibilityLabel().
+const RECORDING_NON_MODERATOR = 'Record';
+const LIVE_STREAMING = 'Start live stream';
 const AUDIO_UNMUTE = 'Unmute microphone';
 const CHAT = 'Open chat';
 const CLOSE_CHAT = 'Close chat';
@@ -9,6 +15,7 @@ const DESKTOP = 'Start sharing your screen';
 const HANGUP = 'Leave the meeting';
 const OVERFLOW_MENU = 'More actions menu';
 const OVERFLOW = 'More actions';
+const CLOSE_OVERFLOW = 'Close more actions menu';
 const PARTICIPANTS = 'Open participants pane';
 const PROFILE = 'Edit your profile';
 const RAISE_HAND = 'Raise your hand';
@@ -49,6 +56,58 @@ export default class Toolbar extends BasePageObject {
      */
     get audioUnMuteBtn() {
         return this.getButton(AUDIO_UNMUTE);
+    }
+
+    /**
+     * Returns whether the recording button exists in the DOM for this participant.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async hasRecordingButton(): Promise<boolean> {
+        // The recording button lives in the overflow ("More actions") menu, so it is only in the
+        // DOM while that menu is open. isExisting() searches the whole DOM, so opening the menu
+        // first also covers the case where the button is promoted to the main toolbar.
+        await this.openOverflowMenu();
+
+        // Match either label since moderators get "Record & Transcribe" while non-moderators
+        // (local recording only) get "Record".
+        const exists = await this.getButton(RECORDING).isExisting()
+            || await this.getButton(RECORDING_NON_MODERATOR).isExisting();
+
+        await this.closeOverflowMenu();
+
+        return exists;
+    }
+
+    /**
+     * Clicks the recording button to open the recording/transcription dialog.
+     *
+     * @returns {Promise<void>}
+     */
+    async clickRecordingButton(): Promise<void> {
+        // The recording button lives in the overflow ("More actions") menu; open it, click, close
+        // (matches clickSettings/clickSecurity — closeOverflowMenu is a no-op once the dialog opens).
+        // Match either label, same as hasRecordingButton: moderators who can't transcribe (e.g.
+        // transcription.enabled=false) get "Record" too, not just non-moderators — see
+        // AbstractRecordButton._getAccessibilityLabel()/canAddTranscriber().
+        return this.clickButtonInOverflowMenu([ RECORDING, RECORDING_NON_MODERATOR ]);
+    }
+
+    /**
+     * Returns whether the live streaming button exists in the DOM for this participant.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async hasLiveStreamingButton(): Promise<boolean> {
+        // Same reasoning as hasRecordingButton: the button lives in the overflow menu, so open it
+        // first to make sure it is in the DOM regardless of whether it got promoted to the main bar.
+        await this.openOverflowMenu();
+
+        const exists = await this.getButton(LIVE_STREAMING).isExisting();
+
+        await this.closeOverflowMenu();
+
+        return exists;
     }
 
     /**
@@ -290,18 +349,30 @@ export default class Toolbar extends BasePageObject {
 
     /**
      * Ensure the overflow menu is open and clicks on a specified button.
-     * @param accessibilityLabel The accessibility label of the button to be clicked.
+     * @param accessibilityLabel The accessibility label of the button to be clicked, or a list of
+     * candidate labels (e.g. a moderator vs. non-moderator variant) — the first one found in the
+     * DOM is clicked.
      * @private
      */
-    private async clickButtonInOverflowMenu(accessibilityLabel: string) {
+    private async clickButtonInOverflowMenu(accessibilityLabel: string | string[]) {
         await this.openOverflowMenu();
 
         // sometimes the overflow button tooltip is over the last entry in the menu,
         // so let's move focus away before clicking the button
         await this.participant.driver.$('#overflow-context-menu').moveTo();
 
-        await this.participant.log(`Clicking on: ${accessibilityLabel}`);
-        await this.getButton(accessibilityLabel).click();
+        const labels = Array.isArray(accessibilityLabel) ? accessibilityLabel : [ accessibilityLabel ];
+        let label = labels[0];
+
+        for (const candidate of labels) {
+            if (await this.getButton(candidate).isExisting()) {
+                label = candidate;
+                break;
+            }
+        }
+
+        await this.participant.log(`Clicking on: ${label}`);
+        await this.getButton(label).click();
 
         await this.closeOverflowMenu();
     }
@@ -357,7 +428,9 @@ export default class Toolbar extends BasePageObject {
             return;
         }
 
-        await this.clickOverflowButton();
+        // When the overflow menu is open the toggle button's aria-label changes from
+        // "More actions" to "Close more actions menu", so we cannot reuse clickOverflowButton here.
+        await this.getButton(CLOSE_OVERFLOW).click();
 
         await this.waitForOverFlowMenu(false);
     }
@@ -370,7 +443,11 @@ export default class Toolbar extends BasePageObject {
     private waitForOverFlowMenu(visible: boolean) {
         return this.getButton(OVERFLOW_MENU).waitForDisplayed({
             reverse: !visible,
-            timeout: 3000,
+
+            // The menu opens with an enter animation and its render can be delayed by several
+            // seconds when the main thread is busy (e.g. right after a rejoin or while a virtual
+            // background effect is loading), so allow a generous timeout before giving up.
+            timeout: 10000,
             timeoutMsg: `Overflow menu is not ${visible ? 'visible' : 'hidden'}`
         });
     }

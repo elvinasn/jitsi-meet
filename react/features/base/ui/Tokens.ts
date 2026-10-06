@@ -166,6 +166,7 @@ export const colorMap = {
     prejoinActionButtonPrimary: 'action01', // Primary action button
     prejoinActionButtonPrimaryHover: 'action01Hover', // Primary button hover
     prejoinActionButtonPrimaryText: 'text01', // Primary button text
+    prejoinActionButtonOptionsHover: 'action01Active', // Join options (arrow) button hover
     prejoinActionButtonSecondary: 'action02', // Secondary action button
     prejoinActionButtonSecondaryHover: 'action02Hover', // Secondary button hover
     prejoinActionButtonSecondaryText: 'text04', // Secondary button text
@@ -385,6 +386,21 @@ export const colorMap = {
     conferenceNoticeText: 'text01',          // Conference notice text
     conferenceRaisedHandLabelText: 'uiBackground', // Raised hands count label text
     conferenceRaisedHandLabelIcon: 'surface01', // Raised hands count label icon
+
+    // Time-timer pill
+    timeTimerNameSegmentBackground: 'timeTimerNameSegment',
+    timeTimerTimerSegmentBackground: 'timeTimerTimerSegment',
+    timeTimerElapsedText: 'timeTimerElapsedText',
+    timeTimerDisk: 'timeTimerDisk',
+    timeTimerWarning: 'timeTimerWarning',
+    timeTimerWarningNameSegmentBackground: 'timeTimerWarningNameSegment',
+    timeTimerWarningTimerSegmentBackground: 'timeTimerWarningTimerSegment',
+    timeTimerExpiredText: 'timeTimerExpiredText',
+    timeTimerExpiredNameSegmentBackground: 'timeTimerExpiredNameSegment',
+    timeTimerExpiredTimerSegmentBackground: 'timeTimerExpiredTimerSegment',
+    timeTimerExpiredDisk: 'timeTimerExpiredDisk',
+    timeTimerExpiredOverrunEdge: 'timeTimerExpiredOverrunEdge',
+    timeTimerExpiredNotificationText: 'timeTimerExpiredNotificationText',
 
     // Subtitle Messages
     subtitleMessageBackground: 'ui02',       // Subtitle message background

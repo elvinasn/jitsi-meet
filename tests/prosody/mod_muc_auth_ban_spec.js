@@ -1,5 +1,6 @@
 import assert from 'assert';
 
+import { getContainer } from './helpers/container.js';
 import { mintAsapToken } from './helpers/jwt.js';
 import { setAccessManagerResponse } from './helpers/test_observer.js';
 import { createXmppClient } from './helpers/xmpp_client.js';
@@ -32,6 +33,41 @@ function createVpaasClient(token) {
         params: { prefix: VPAAS_PREFIX,
             token }
     });
+}
+
+/**
+ * Asserts that a VPaaS session is banned, whichever way the ban surfaces.
+ *
+ * mod_muc_auth_ban's HTTP callback calls session:close(), and where that lands
+ * depends on when the access manager answers. Answering within the same event
+ * loop tick as the SASL auth refuses the connection outright; answering a tick
+ * later lets the session establish and then closes it. Both are the same ban,
+ * and which one happens is timing, so accept either rather than only the first.
+ *
+ * @param {string} token  A login JWT the access manager will reject.
+ * @param {string} message  Assertion message.
+ * @returns {Promise<void>}
+ */
+async function assertBanned(token, message) {
+    let client;
+
+    try {
+        client = await createVpaasClient(token);
+    } catch (e) {
+        // refused during SASL
+        assert.match(String(e), /not-allowed/, message);
+
+        return;
+    }
+
+    // established, so the close must follow
+    const disconnected = await client.waitForDisconnect(5000).then(() => true, () => false);
+
+    if (!disconnected) {
+        await client.disconnect();
+    }
+
+    assert.ok(disconnected, message);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -94,21 +130,17 @@ describe('mod_muc_auth_ban', () => {
     // ── VPaaS — access denied ─────────────────────────────────────────────────
     //
     // When access=false, mod_muc_auth_ban's HTTP callback calls session:close()
-    // and caches the token. Because the access manager runs on the same Prosody
-    // process (loopback), the callback resolves within the same event loop tick
-    // as the SASL auth, so the ban surfaces as a SASL failure rather than a
-    // post-connect disconnect.
+    // and caches the token. The access manager runs on the same Prosody process
+    // (loopback), so the callback usually resolves within the same event loop
+    // tick as the SASL auth and the ban surfaces as a SASL failure, but under
+    // load it can resolve a tick later and close an established session instead.
+    // assertBanned accepts either.
 
-    it('VPaaS user is rejected (SASL failure) when access manager returns access=false', async () => {
+    it('VPaaS user is rejected when access manager returns access=false', async () => {
         await setAccessManagerResponse({ access: false });
 
-        const token = freshToken();
-
-        await assert.rejects(
-            createVpaasClient(token),
-            /not-allowed/,
-            'VPaaS user must be rejected when access manager returns access=false'
-        );
+        await assertBanned(freshToken(),
+            'VPaaS user must be rejected when access manager returns access=false');
     });
 
     // ── Cached ban ────────────────────────────────────────────────────────────
@@ -124,11 +156,7 @@ describe('mod_muc_auth_ban', () => {
 
         const token = freshToken();
 
-        await assert.rejects(
-            createVpaasClient(token),
-            /not-allowed/,
-            'initial ban must be rejected'
-        );
+        await assertBanned(token, 'initial ban must be rejected');
 
         // Step 2: Reset the mock to allow. A fresh token must now succeed,
         // proving the cache — not the mock response — drives the next rejection.
@@ -139,11 +167,8 @@ describe('mod_muc_auth_ban', () => {
         await fresh.disconnect();
 
         // Step 3: Same banned token must still be rejected (cache wins over mock).
-        await assert.rejects(
-            createVpaasClient(token),
-            /not-allowed/,
-            'cached banned token must be rejected even when mock is reset to allow'
-        );
+        await assertBanned(token,
+            'cached banned token must be rejected even when mock is reset to allow');
     });
 
     // ── HTTP error — fail open ────────────────────────────────────────────────
@@ -164,6 +189,74 @@ describe('mod_muc_auth_ban', () => {
         // after the timeout — instead, assert the connection is alive by
         // verifying disconnect() completes cleanly.
         await c.disconnect();
+    });
+
+    // ── Non-JSON 200 — should fail open without crashing ─────────────────────
+    //
+    // When the access manager returns HTTP 200 but with a non-JSON body,
+    // json.decode() returns nil. mod_muc_auth_ban then calls r['access'] on
+    // nil, which crashes the callback. The crash must not affect the session
+    // (fail open: user stays connected).
+
+    it('non-JSON 200 from access manager does not crash or ban the user (fail open)', async () => {
+        await setAccessManagerResponse({ nonJson: true });
+
+        const token = freshToken();
+        const c = await createVpaasClient(token);
+
+        // Wait long enough for the async HTTP callback to have fired and crashed.
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Session must still be alive despite the callback crash.
+        const disconnected = await c.waitForDisconnect(300).then(() => true, () => false);
+
+        assert.strictEqual(disconnected, false,
+            'session must remain alive when access manager returns non-JSON 200');
+
+        await c.disconnect();
+    });
+
+    // ── Non-JSON 200 — Lua error in callback ─────────────────────────────────
+    //
+    // cjson.safe returns nil (not an error) for invalid JSON, so json.decode()
+    // returns nil when the access manager body is not JSON. Without a nil guard,
+    // r['access'] on the nil value crashes the callback with "attempt to index
+    // a nil value". This test catches that crash by asserting that no such error
+    // appears in the Prosody log during the test window.
+
+    it('non-JSON 200 does not produce a Lua error in the HTTP callback', async () => {
+        const since = Math.floor(Date.now() / 1000);
+
+        await setAccessManagerResponse({ nonJson: true });
+        const token = freshToken();
+        const c = await createVpaasClient(token);
+
+        // Give the async HTTP callback time to fire (and crash if the bug is present).
+        await new Promise(resolve => setTimeout(resolve, 600));
+        await c.disconnect();
+
+        // Collect Prosody log output from this test's window.
+        const until = Math.floor(Date.now() / 1000) + 1;
+        const container = getContainer();
+        const stream = await container.logs({ since,
+            until });
+        const logs = await new Promise((resolve, reject) => {
+            const chunks = [];
+            const timer = setTimeout(() => resolve(chunks.join('')), 2000);
+
+            stream.on('data', chunk => chunks.push(chunk.toString()));
+            stream.on('end', () => {
+                clearTimeout(timer);
+                resolve(chunks.join(''));
+            });
+            stream.on('error', reject);
+        });
+
+        assert.ok(
+            !logs.includes('attempt to index a nil value'),
+            'mod_muc_auth_ban HTTP callback must not crash on non-JSON 200 response '
+            + '(missing nil guard on json.decode result)'
+        );
     });
 
 });
