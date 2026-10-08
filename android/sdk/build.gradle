@@ -215,6 +215,14 @@ android.libraryVariants.all { def variant ->
     mergeAssetsTask.dependsOn(currentBundleTask)
     mergeResourcesTask.dependsOn(currentBundleTask)
 
+    // mergeAssetsTask injects the JS bundle via a doLast copy (below), which Gradle's
+    // up-to-date check can't see unless the bundle dir is declared as a real input -
+    // without this, a changed JS bundle doesn't invalidate mergeAssets/bundleReleaseAar,
+    // and `publish` (without `clean`) can ship assets from a stale previous bundle.
+    mergeAssetsTask.inputs.files(currentBundleTask.generatedAssetsFolders)
+        .withPropertyName("jitsiGeneratedJsBundle")
+        .optional()
+
     mergeAssetsTask.doLast {
         def assetsDir = mergeAssetsTask.outputDir.get()
 
