@@ -163,7 +163,8 @@ android.libraryVariants.all { def variant ->
             excludes: [
                 "android/**",
                 "ios/**",
-                "node_modules/**/android/build/**"
+                "node_modules/**/android/build/**",
+                "node_modules/**/android/buildOutput_*/**"
             ])
         outputs.dir jsBundleDir
         outputs.dir resourcesDir
