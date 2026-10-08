@@ -107,7 +107,7 @@ class ReactHostHolder {
             new com.swmansion.gesturehandler.RNGestureHandlerPackage(),
             new org.linusu.RNGetRandomValuesPackage(),
             new com.swmansion.rnscreens.RNScreensPackage(),
-            new com.zmxv.RNSound.SoundPackage(),
+            new com.zmxv.RNSound.RNSoundPackage(),
             new com.th3rdwave.safeareacontext.SafeAreaContextPackage(),
             new com.horcrux.svg.SvgPackage(),
             new org.wonday.orientation.OrientationPackage(),
