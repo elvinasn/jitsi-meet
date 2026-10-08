@@ -3118,10 +3118,33 @@ PODS:
     - SocketRocket
     - Yoga
   - RNSound (0.11.2):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
     - React-Core
-    - RNSound/Core (= 0.11.2)
-  - RNSound/Core (0.11.2):
-    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RNSVG (15.15.5):
     - boost
     - DoubleConversion
@@ -3682,7 +3705,7 @@ SPEC CHECKSUMS:
   RNGestureHandler: 134038656528f73e25481a0dead241eded15ff83
   RNGoogleSignin: a6a612cce56a45ab701c5c5c6e36f5390522d100
   RNScreens: ec8bdc9f024d5828e5adf4f5e8870d5260cff616
-  RNSound: 6c156f925295bdc83e8e422e7d8b38d33bc71852
+  RNSound: 88a5d6f58229827bab71cd0a0ee3b40998110106
   RNSVG: a93856a60bcd766b4d5d20f96a7b4a2978462ca4
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   SplashView: 672c82c4bee9c7e6373ff435535fa8c26be689ae
